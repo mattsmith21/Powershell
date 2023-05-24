@@ -1,0 +1,41 @@
+#MUST HAVE 'ImportExcel' CMDLET INSTALLED! 'https://github.com/dfinke/ImportExcel/blob/master/README.md'
+#Install using: Install-Module -Name ImportExcel
+
+$File = "" #inport & export file
+
+$data = Import-Excel -Path $File -WorksheetName "Term List"     #imports .xlsx as $data
+$continue = $true 
+$i = 1      #acts as a counter for counting 
+while($continue){
+    $username = $data[$i].'Email Address [Modified]'    #searching row with variable $i and column is set to 'email'
+    if ($null -eq $username) { #if username is blank then set continue to false
+        $continue = $false 
+        break
+    }
+      
+    Write-Host ""
+    Write-Host "User grabbed: $username"
+
+
+    $detailedUsers=[System.Collections.ArrayList]@()
+
+    $newuser = New-Object -typename psobject 
+    $userdata = (get-aduser -identity $username -property lastlogondate, department, DisplayName)  #search username in active directory & save nessasary fields
+    $Dept = ($userdata | Select-Object department | format-table -hidetableheaders) | Out-String    #saved department as the variable $Dept 
+    $FirstLast = ($userdata | Select-Object DisplayName | Format-Table -HideTableHeaders) | Out-String  #Save First&Last name as $FirstLast
+    $LLO = ($userdata | Select-Object LastLogonDate | format-table -hidetableheaders) | Out-String    #LastLogOn is saved as the variable $LLO 
+    $LLO = $LLO -split ' '      #removes unnecessary data
+    #Write-Output $Dept.trimend()
+    #write-output $LLO[0] 
+    Add-Member -InputObject $newuser -MemberType NoteProperty -Name "First/ Last Name" -Value $FirstLast #creats column name and sets as target
+    Add-Member -InputObject $newuser -MemberType NoteProperty -Name "username" -Value $username
+    Add-Member -InputObject $newuser -MemberType NoteProperty -Name "Department ID " -Value $Dept
+    Add-Member -InputObject $newuser -MemberType NoteProperty -Name "Last Log On" -Value $LLO[0]
+    
+    [void]$detailedUsers.add($newuser)
+    
+    $detailedUsers | export-excel -path $File -WorksheetName "Report" -AutoSize -Append #exports data to file
+    #write data to sheet
+
+    $i += 1
+}
